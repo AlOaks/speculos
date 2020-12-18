@@ -172,6 +172,11 @@ if __name__ == '__main__':
     group.add_argument('--keymap', action='store', help="Text UI keymap in the form of a string (e.g. 'was' => 'w' for left button, 'a' right, 's' both). Default: arrow keys")
     group.add_argument('--progressive', action='store_true', help='Enable step-by-step rendering of graphical elements')
     group.add_argument('--zoom', help='Display pixel size.', type=int, choices=range(1, 11))
+    group.add_argument(
+        "--record-frames",
+        type=str,
+        help="Record frames under <filename>-\%d.txt for pixel wide precision",
+    )
 
     args = parser.parse_args()
     args.model.lower()
@@ -202,7 +207,15 @@ if __name__ == '__main__':
         logger.error("-z (--zoom) can only be used with --display qt")
         sys.exit(1)
 
-    if args.keymap and args.display != 'text':
+    if args.record_frames:
+        try:
+            with open(f"{args.record_frames}-00.txt", 'w') as f:
+                pass
+        except IOError:
+            logger.error("Cannot record frames with the passed filename")
+            sys.exit(1)
+
+    if args.keymap and args.display != "text":
         logger.error("-y (--keymap) can only be used with --display text")
         sys.exit(1)
 
@@ -270,7 +283,20 @@ if __name__ == '__main__':
         }
         zoom = default_zoom.get(args.model)
 
-    screen = Screen(apdu, seph, button_tcp=button_tcp, finger_tcp=finger_tcp, color=args.color, model=args.model, ontop=args.ontop, rendering=rendering, vnc=vnc, keymap=args.keymap, pixel_size=zoom)
+    screen = Screen(
+        apdu,
+        seph,
+        button_tcp=button_tcp,
+        finger_tcp=finger_tcp,
+        color=args.color,
+        model=args.model,
+        ontop=args.ontop,
+        rendering=rendering,
+        vnc=vnc,
+        keymap=args.keymap,
+        pixel_size=zoom,
+        record_frames=args.record_frames,
+    )
     screen.run()
 
     s2.close()

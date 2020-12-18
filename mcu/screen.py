@@ -12,7 +12,9 @@ BUTTON_LEFT  = 1
 BUTTON_RIGHT = 2
 
 class PaintWidget(QWidget):
-    def __init__(self, parent, model, pixel_size, vnc=None):
+    """High Level QT Widget for drawing screen content on your computer."""
+
+    def __init__(self, parent, model, pixel_size, vnc=None, record_frames=None):
         super().__init__(parent)
         self.fb = FrameBuffer(model)
         self.pixel_size = pixel_size
@@ -35,8 +37,9 @@ class PaintWidget(QWidget):
             # Only call scaled if needed.
             copied_pixmap = self.mPixmap.scaled(
                 self.mPixmap.width() * self.pixel_size,
-                self.mPixmap.height() * self.pixel_size)
-        qp.drawPixmap(0, 0, copied_pixmap )
+                self.mPixmap.height() * self.pixel_size,
+            )
+        qp.drawPixmap(0, 0, copied_pixmap)
 
     def _redraw(self, qp):
         for (x, y), color in self.fb.pixels.items():
@@ -49,12 +52,13 @@ class PaintWidget(QWidget):
     def draw_point(self, x, y, color):
         return self.fb.draw_point(x, y, color)
 
+
 class Screen(Display):
-    def __init__(self, app, apdu, seph, button_tcp, finger_tcp, model, rendering, vnc):
+    def __init__(self, app, apdu, seph, button_tcp, finger_tcp, model, rendering, vnc, record_frames=None):
         self.app = app
         super().__init__(apdu, seph, model, rendering)
         self._init_notifiers(apdu, seph, button_tcp, finger_tcp, vnc)
-        self.bagl = bagl.Bagl(app.m, MODELS[model].screen_size)
+        self.bagl = bagl.Bagl(app.m, MODELS[model].screen_size, record_frames=record_frames)
         self.seph = seph
 
     def add_notifier(self, klass):
@@ -90,23 +94,37 @@ class Screen(Display):
 
     def display_status(self, data):
         ret = self.bagl.display_status(data)
-        if MODELS[self.model].name == 'blue':
-            self.screen_update()    # Actually, this method doesn't work
+        if MODELS[self.model].name == "blue":
+            self.screen_update()  # Actually, this method doesn't work
         return ret
 
     def display_raw_status(self, data):
         self.bagl.display_raw_status(data)
-        if MODELS[self.model].name == 'blue':
-            self.screen_update()    # Actually, this method doesn't work
+        if MODELS[self.model].name == "blue":
+            self.screen_update()  # Actually, this method doesn't work
 
     def screen_update(self):
         self.bagl.refresh()
 
+
 class App(QMainWindow):
-    def __init__(self, apdu, seph, button_tcp, finger_tcp, color, model, ontop, rendering, vnc, pixel_size):
+    def __init__(
+        self,
+        apdu,
+        seph,
+        button_tcp,
+        finger_tcp,
+        color,
+        model,
+        ontop,
+        rendering,
+        vnc,
+        pixel_size,
+        record_frames=None,
+    ):
         super().__init__()
 
-        self.setWindowTitle('Ledger %s Emulator' % MODELS[model].name)
+        self.setWindowTitle("Ledger %s Emulator" % MODELS[model].name)
 
         self.seph = seph
         self.width, self.height = MODELS[model].screen_size
@@ -139,9 +157,11 @@ class App(QMainWindow):
         self.m.move(self.box_position_x * pixel_size, self.box_position_y * pixel_size)
         self.m.resize(self.width * pixel_size, self.height * pixel_size)
 
-        self.screen = Screen(self, apdu, seph, button_tcp, finger_tcp, model, rendering, vnc)
+        self.screen = Screen(
+            self, apdu, seph, button_tcp, finger_tcp, model, rendering, vnc, record_frames=record_frames
+        )
 
-        self.setWindowIcon(QIcon('mcu/icon.png'))
+        self.setWindowIcon(QIcon("mcu/icon.png"))
 
         self.show()
 
@@ -185,18 +205,45 @@ class App(QMainWindow):
         self.move(x - x_w, y - y_w)
 
     def closeEvent(self, event):
-        '''
+        """
         Called when the window is closed. We save the current window position to
         the settings file in order to restore it upon next speculos execution.
-        '''
+        """
         settings = QSettings("ledger", "speculos")
         settings.setValue("window_x", self.pos().x())
         settings.setValue("window_y", self.pos().y())
 
+
 class QtScreen:
-    def __init__(self, apdu, seph, button_tcp=None, finger_tcp=None, color='MATTE_BLACK', model='nanos', ontop=False, rendering=RENDER_METHOD.FLUSHED, vnc=None, pixel_size=2, **_):
+    def __init__(
+        self,
+        apdu,
+        seph,
+        button_tcp=None,
+        finger_tcp=None,
+        color="MATTE_BLACK",
+        model="nanos",
+        ontop=False,
+        rendering=RENDER_METHOD.FLUSHED,
+        vnc=None,
+        pixel_size=2,
+        record_frames=None,
+        **_
+    ):
         self.app = QApplication(sys.argv)
-        self.app_widget = App(apdu, seph, button_tcp, finger_tcp, color, model, ontop, rendering, vnc, pixel_size)
+        self.app_widget = App(
+            apdu,
+            seph,
+            button_tcp,
+            finger_tcp,
+            color,
+            model,
+            ontop,
+            rendering,
+            vnc,
+            pixel_size,
+            record_frames=record_frames,
+        )
 
     def run(self):
         self.app.exec_()
